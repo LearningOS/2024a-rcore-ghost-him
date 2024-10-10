@@ -1,0 +1,1 @@
+/home/ghost-him/2024a-rcore-ghost-him/os/target/riscv64gc-unknown-none-elf/release/os: /home/ghost-him/2024a-rcore-ghost-him/os/src/console.rs /home/ghost-him/2024a-rcore-ghost-him/os/src/entry.asm /home/ghost-him/2024a-rcore-ghost-him/os/src/lang_items.rs /home/ghost-him/2024a-rcore-ghost-him/os/src/main.rs /home/ghost-him/2024a-rcore-ghost-him/os/src/sbi.rs
