@@ -50,8 +50,8 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     let buffers = translated_byte_buffer(current_user_token(), _ts as *const u8, size_of::<TimeVal>());
     let us = get_time_us();
     let time_val = TimeVal {
-        sec: us/1000000,
-        usec: us % 1000000,
+        sec: us/1_000_000,
+        usec: us % 1_000_000,
     };
 
     let mut time_val_ptr = &time_val as *const _ as *const u8;
