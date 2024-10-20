@@ -23,6 +23,11 @@ use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
+use crate::timer::get_time_ms;
+use crate::config::MAX_SYSCALL_NUM;
+use crate::mm::{VirtAddr};
+use crate::mm::{MapPermission};
+
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -142,6 +147,8 @@ impl TaskManager {
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
+            // 记录一下第一次的运行时间
+            record_first_switch( &mut inner.tasks[next]);
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
             // before this, we should drop local variables that must be dropped manually
@@ -152,6 +159,70 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+
+    /// 查询当前任务的状态
+    fn query_current_task_status(&self) -> TaskStatus {
+        let inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].task_status
+    }
+    /// 查询当前运行任务的第一次运行时间
+    fn query_current_task_first_run_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].first_reload_time.unwrap_or(0)
+    }
+    /// 查询当前运行任务的系统调用次数
+    fn query_current_task_syscall_times(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].syscall_times
+    }
+    /// 向当前任务添加一次系统调用次数
+    fn add_current_task_syscall_time(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].syscall_times[syscall_id] += 1;
+    }
+    /// 申请内存
+    fn allocate_new_space(&self, start: usize, len:usize, port:usize) -> isize {
+        if port & !0x7 != 0 {
+            return -1;
+        }
+        if port & 0x7 == 0{
+            return -1;
+        }
+        let va_start : VirtAddr= start.into();
+        if !va_start.aligned() {
+            return -1;
+        }
+        let mut permission = MapPermission::empty();
+        if port & 1 == 1 {
+            permission |= MapPermission::R;
+        }
+        if port & 2 == 1 {
+            permission |= MapPermission::W;
+        }
+        if port & 4 == 1 {
+            permission |= MapPermission::X;
+        }
+            
+        // 获得应用程序的空间
+        let mut inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].memory_set.allocate_new_space(VirtAddr::from(start), len, permission)
+    }
+    /// 回收一个空间
+    fn deallocate_space(&self, start:usize, len:usize) -> isize {
+        let va_start : VirtAddr= start.into();
+        if !va_start.aligned() {
+            return -1;
+        }
+        // 获得应用程序的空间
+        let mut inner = self.inner.exclusive_access();
+        let current_idx = inner.current_task;
+        inner.tasks[current_idx].memory_set.deallocate_space(VirtAddr::from(start), len)
     }
 }
 
@@ -201,4 +272,38 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+/// 公共接口，查询当前任务的状态
+pub fn query_current_task_status() -> TaskStatus {
+    TASK_MANAGER.query_current_task_status()
+}
+/// 公共接口，查询当前任务第一次运行的时间
+pub fn query_current_task_first_run_time() -> usize {
+    TASK_MANAGER.query_current_task_first_run_time()
+}
+/// 公共接口，查询当前任务系统调用的次数
+pub fn query_current_task_syscall_times() -> [u32; MAX_SYSCALL_NUM] {
+    TASK_MANAGER.query_current_task_syscall_times()
+}
+/// 公共接口，向当前运行的任务添加一次系统调用的次数
+pub fn add_current_task_syscall_time(syscall_id: usize) {
+    TASK_MANAGER.add_current_task_syscall_time(syscall_id);
+}
+
+/// 记录第一次运行的时间
+fn record_first_switch(task_cx_ptr: &mut TaskControlBlock) {
+    if task_cx_ptr.first_reload_time.is_none() {
+        let time : usize = get_time_ms();
+        task_cx_ptr.first_reload_time = Some(time);
+    }
+}
+
+/// 应用程序申请一个内存
+pub fn allocate_new_space(start: usize, len:usize, port:usize) ->isize {
+    TASK_MANAGER.allocate_new_space(start, len, port)
+}
+
+/// 回收一个空间
+pub fn deallocate_space(start: usize, len : usize) -> isize {
+    TASK_MANAGER.deallocate_space(start, len)
 }
