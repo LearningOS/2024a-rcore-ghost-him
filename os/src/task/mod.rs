@@ -197,21 +197,16 @@ impl TaskManager {
         if !va_start.aligned() {
             return -1;
         }
-        let mut permission = MapPermission::empty();
-        if port & 1 == 1 {
-            permission |= MapPermission::R;
-        }
-        if port & 2 == 1 {
-            permission |= MapPermission::W;
-        }
-        if port & 4 == 1 {
-            permission |= MapPermission::X;
-        }
+        let mut permissions = MapPermission::empty();
+        permissions.set(MapPermission::R, port & 0x1 != 0);
+        permissions.set(MapPermission::W, port & 0x2 != 0);
+        permissions.set(MapPermission::X, port & 0x4 != 0);
+        permissions.set(MapPermission::U, true);
             
         // 获得应用程序的空间
         let mut inner = self.inner.exclusive_access();
         let current_idx = inner.current_task;
-        inner.tasks[current_idx].memory_set.allocate_new_space(VirtAddr::from(start), len, permission)
+        inner.tasks[current_idx].memory_set.allocate_new_space(VirtAddr::from(start), len, permissions)
     }
     /// 回收一个空间
     fn deallocate_space(&self, start:usize, len:usize) -> isize {
