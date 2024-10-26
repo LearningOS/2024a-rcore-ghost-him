@@ -138,6 +138,54 @@ impl Inode {
         )))
         // release efs lock automatically by compiler
     }
+    /// 复制得到一个硬链接
+    pub fn copy(&self, name:&str) -> i32 {
+        let mut fs: EasyFileSystem = self.fs.lock();
+        let op = |root_inode: &DiskInode| {
+            // assert it is a directory
+            assert!(root_inode.is_dir());
+            // has the file been created?
+            self.find_inode_id(name, root_inode)
+        };
+        if self.read_disk_inode(op).is_some() {
+            return -1;
+        }
+        let new_inode_id = fs.alloc_inode();
+        let (new_inode_block_id, new_inode_block_offset) = fs.get_disk_inode_pos(new_inode_id);
+        // 初始化对应的磁盘，将磁盘指向这个节点的磁盘
+        get_block_cache(new_inode_block_id as usize, Arc::clone(&self.block_device))
+            .lock()
+            .modify(new_inode_block_offset, |new_inode: &mut DiskInode| {
+                let disk_node = self.read_disk_inode(|disk_node|{
+                    disk_node
+                });
+                new_inode.copy_from(disk_node);
+            });
+        
+        let root_inode = EasyFileSystem::root_inode(&fs);
+        // 将这个添加到根目录的页表下
+        root_inode.modify_disk_inode(|root_inode| {
+            // append file in the dirent
+            let file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let new_size = (file_count + 1) * DIRENT_SZ;
+            // increase size
+            self.increase_size(new_size as u32, root_inode, &mut fs);
+            // write dirent
+            let dirent = DirEntry::new(name, new_inode_id);
+            root_inode.write_at(
+                file_count * DIRENT_SZ,
+                dirent.as_bytes(),
+                &self.block_device,
+            );
+        });
+
+        block_cache_sync_all();
+        // return inode
+        0
+    }
+
+
+
     /// List inodes under current inode
     pub fn ls(&self) -> Vec<String> {
         let _fs = self.fs.lock();
@@ -183,4 +231,5 @@ impl Inode {
         });
         block_cache_sync_all();
     }
+
 }

@@ -69,6 +69,7 @@ impl SuperBlock {
 }
 /// Type of a disk inode
 #[derive(PartialEq)]
+#[derive(Clone,Copy)]
 pub enum DiskInodeType {
     File,
     Directory,
@@ -98,6 +99,14 @@ impl DiskInode {
         self.indirect2 = 0;
         self.type_ = type_;
     }
+    pub fn copy_from(&mut self, other: &DiskInode) {
+        self.size = other.size;
+        self.direct = other.direct;
+        self.indirect1 = other.indirect1;
+        self.indirect2 = other.indirect2;
+        self.type_ = other.type_;
+    }
+
     /// Whether this inode is a directory
     pub fn is_dir(&self) -> bool {
         self.type_ == DiskInodeType::Directory

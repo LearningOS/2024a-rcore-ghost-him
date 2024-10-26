@@ -52,15 +52,17 @@ const SYSCALL_SPAWN: usize = 400;
 const SYSCALL_TASK_INFO: usize = 410;
 
 mod fs;
-mod process;
+pub mod process;
 
 use fs::*;
 use process::*;
 
 use crate::fs::Stat;
+use crate::task::processor::add_current_task_syscall_time;
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+    add_current_task_syscall_time(syscall_id);
     match syscall_id {
         SYSCALL_OPEN => sys_open(args[1] as *const u8, args[2] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
@@ -85,3 +87,5 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
+
+

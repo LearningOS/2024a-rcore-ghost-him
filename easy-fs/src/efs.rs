@@ -148,4 +148,20 @@ impl EasyFileSystem {
             (block_id - self.data_area_start_block) as usize,
         )
     }
+
+    pub fn linkat(&mut self, olddirfd: i32, oldpath: *const u8, newdirfd: i32, newpath: *const u8, flags: u32) ->i32 {
+        if oldpath.as_str() == newpath.as_str() {
+            return -1;
+        }
+        let root_node = Self::root_inode();
+        let old_inode = root_node.find(oldpath.as_str()).unwrap();
+
+        old_inode.copy(newpath)
+    }
+
+    pub fn unlinkat(&mut self, dirfd: i32, path: *const u8, flags: u32) -> i32 {
+        1
+    }
+
+
 }

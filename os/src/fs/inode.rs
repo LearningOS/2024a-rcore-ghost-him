@@ -124,6 +124,8 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
     }
 }
 
+
+
 impl File for OSInode {
     fn readable(&self) -> bool {
         self.readable

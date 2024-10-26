@@ -4,6 +4,7 @@ mod inode;
 mod stdio;
 
 use crate::mm::UserBuffer;
+use alloc::vec::Vec;
 
 /// trait File for all file types
 pub trait File: Send + Sync {
@@ -45,6 +46,27 @@ bitflags! {
         const FILE  = 0o100000;
     }
 }
+/// 根据名字来获取当前程序的内容
+pub fn get_app_data_by_name(name: & str) ->  Option<Vec<u8>> {
+    if let Some(os_inode) = open_file(name, OpenFlags::RDONLY) {
+        Some(os_inode.read_all())
+    } else {
+        None
+    }
+}
+
+/// 硬链接
+
+fn linkat(olddirfd: i32, oldpath: *const u8, newdirfd: i32, newpath: *const u8, flags: u32) -> i32 {
+    
+
+
+
+    
+
+}
+
+
 
 pub use inode::{list_apps, open_file, OSInode, OpenFlags};
 pub use stdio::{Stdin, Stdout};

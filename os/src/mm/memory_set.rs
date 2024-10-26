@@ -318,6 +318,60 @@ impl MemorySet {
             false
         }
     }
+
+    /// 分配一个新的空间
+    pub fn allocate_new_space(&mut self, start: VirtAddr, len: usize, permission: MapPermission) ->isize {
+        let end = VirtAddr::from(start.0 + len);
+        let mut vpn_start = start.floor();
+
+        for _ in 0..((len + PAGE_SIZE - 1) / PAGE_SIZE) {
+            match self.page_table.translate(vpn_start) {
+                Some(pte) => {
+                    if pte.is_valid() {
+                        return -1;
+                    }
+                } 
+                None => {}
+            }
+            vpn_start.step();
+        }
+
+        let mut new_area = MapArea::new(
+            start,
+            end,
+            MapType::Framed,
+            permission,
+        );
+        new_area.map(&mut self.page_table);
+        self.areas.push(new_area);
+        0
+    }
+    /// 回收一个空间
+    pub fn deallocate_space(&mut self, start: VirtAddr, len : usize) -> isize {
+        let end = VirtAddr::from(start.0 + len);
+
+        let mut vpn_start = start.floor();
+
+        for _ in 0..((len + PAGE_SIZE - 1) / PAGE_SIZE) {
+            match self.page_table.translate(vpn_start) {
+                Some(pte) => {
+                    if !pte.is_valid() {
+                        return -1;
+                    }
+                }
+                None => return -1,
+            }
+            vpn_start.step();
+        }
+        let area = VPNRange::new(
+            start.floor(),
+            end.ceil(),
+        );
+        for vpn in area {
+            self.page_table.unmap(vpn);
+        }
+        0
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
